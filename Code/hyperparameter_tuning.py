@@ -19,6 +19,8 @@ def grid_search_hyperparams(HYPER_PARAMS, x_train, y_train, model, seed=42):
     """
     best_config = {"params": None, "score": 0}
 
+    print('\t',f"Testing {len(list(itertools.product(*HYPER_PARAMS.values())))} configurations...")
+
     for params in itertools.product(*HYPER_PARAMS.values()):
         params = {k: v for k, v in zip(HYPER_PARAMS, params)}
 
@@ -26,7 +28,7 @@ def grid_search_hyperparams(HYPER_PARAMS, x_train, y_train, model, seed=42):
             x_train, y_train, model, params, verbose=0, random_state=seed
         )
 
-        print('\t',f"Score: {score}, Params: {params}")
+        print('\t\t',f"Score: {score}, Params: {params}")
 
         if score > best_config["score"]:
             best_config = {"params": params, "score": score}

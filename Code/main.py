@@ -46,7 +46,7 @@ for k, (train_idx, test_idx) in enumerate(outer_cv.split(x, y)):
     )
 
     x_train, x_test = generate_features(
-        x_train, x_test, y_train, y_test, best_config_params, seed=SEED
+        x_train, x_test, y_train, y_test, best_config_params, seed=SEED, verbose=1
     )
 
     model.fit(x_train, y_train, verbose=0)
@@ -59,4 +59,4 @@ for k, (train_idx, test_idx) in enumerate(outer_cv.split(x, y)):
     results.append(metrics)
 
 for metric in results[0]:
-    print(f"{metric}: {np.mean([result[metric] for result in results])}")
+    print(f"{metric}: {np.mean([result[metric] for result in results]):.3f}")
