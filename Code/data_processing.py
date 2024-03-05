@@ -53,13 +53,13 @@ def generate_features(
     x_train = x_train.loc[:, x_train.sum() >= params["binary_threshold"]]
     x_test = x_test.loc[:, x_train.columns]
 
-    print('\t\t\t',f"Using features:", end="")
+    if verbose: print('\t\t\t',f"Using features:", end="")
 
     if params["use_original_features"]:
         x_train_temp = pd.concat([x_train_temp, x_train], axis=1)
         x_test_temp = pd.concat([x_test_temp, x_test], axis=1)
 
-        print(f"+ {x_train.shape[1]} OG", end="")
+        if verbose: print(f"+ {x_train.shape[1]} OG", end="")
 
     if params["use_xofn_features"]:
         xofn_features = construct_xofn_features(
@@ -75,9 +75,9 @@ def generate_features(
         x_train_temp = pd.concat([x_train_temp, x_train_xofn], axis=1)
         x_test_temp = pd.concat([x_test_temp, x_test_xofn], axis=1)
 
-        print(f"+ {x_train_xofn.shape[1]} X-of-N", end="")
+        if verbose: print(f"+ {x_train_xofn.shape[1]} X-of-N", end="")
 
-    print()
+    if verbose: print()
 
     return x_train_temp, x_test_temp
 

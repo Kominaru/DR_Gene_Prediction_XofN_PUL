@@ -14,11 +14,11 @@ CV_INNER = 5
 SEED = 42 if len(sys.argv) < 2 else int(sys.argv[1])
 DO_GRID_SEARCH = True
 HYPER_PARAMS = {
-    "sampling_method": ["weighted"],
-    "binary_threshold": [5],
-    "use_original_features": [False],
+    "sampling_method": ["under"],
+    "binary_threshold": [4],
+    "use_original_features": [True],
     "use_xofn_features": [True],
-    "xofn_min_sample_leaf": [2, 5, 10],
+    "xofn_min_sample_leaf": [2,5,10],
 }
 
 
