@@ -3,7 +3,7 @@
 # Define a list of integer numbers
 numbers=(42 727 1337 33 14 177013 39 56709 1312 241543903)
 
-experiment_name="OG_XofN"
+experiment_name="XofN"
 
 # Create outputs folder if it doesn't exist
 mkdir -p outputs

@@ -27,11 +27,15 @@ def get_model(model: str, random_state: int) -> Union[
     if model == "EEC":
         model = EasyEnsembleClassifier(random_state=random_state)
     elif model == "BRF":
-        model = BalancedRandomForestClassifier(random_state=random_state, n_jobs=4)
-    elif model == "CAT":
-        model = CatBoostClassifier(
-            random_state=random_state, n_estimators=500, auto_class_weights="Balanced"
+        model = BalancedRandomForestClassifier(
+            random_state=random_state,
+            n_jobs=4,
+            sampling_strategy=1.0,
+            replacement=True,
+            n_estimators=500,
         )
+    elif model == "CAT":
+        model = CatBoostClassifier(random_state=random_state, n_estimators=500)
     elif model == "XGB":
         model = XGBClassifier(random_state=random_state)
     else:

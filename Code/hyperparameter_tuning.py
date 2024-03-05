@@ -2,7 +2,7 @@ import itertools
 from Code.model_training import cv_train_with_params
 
 
-def grid_search_hyperparams(HYPER_PARAMS, x_train, y_train, model, seed=42):
+def grid_search_hyperparams(HYPER_PARAMS, x_train, y_train, model, seed):
     """
     Perform grid search to find the best hyperparameters for a given model.
 
@@ -10,7 +10,7 @@ def grid_search_hyperparams(HYPER_PARAMS, x_train, y_train, model, seed=42):
         - HYPER_PARAMS (dict): A dictionary containing the hyperparameters to be tuned.
         - x_train (array-like): The input features for training.
         - y_train (array-like): The target variable for training.
-        - model: Model object with fit and predict methods.
+        - model: String representing the model to be used.
         - cv_inner (int, optional): The number of folds for inner cross-validation.
         - seed (int, optional): The random seed for reproducibility. Default is 42.
 
@@ -18,6 +18,9 @@ def grid_search_hyperparams(HYPER_PARAMS, x_train, y_train, model, seed=42):
     dict: The best hyperparameters found during grid search.
     """
     best_config = {"params": None, "score": 0}
+
+    if len(list(itertools.product(*HYPER_PARAMS.values()))) == 1:
+        return {k: v[0] for k, v in HYPER_PARAMS.items()}
 
     print('\t',f"Testing {len(list(itertools.product(*HYPER_PARAMS.values())))} configurations...")
 

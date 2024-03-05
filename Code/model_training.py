@@ -1,31 +1,34 @@
 import numpy as np
 from sklearn.model_selection import StratifiedKFold
-from imblearn.metrics import geometric_mean_score
 from Code.data_processing import generate_features, resample_data
+from Code.models import get_model
+from sklearn.metrics import roc_auc_score
 
 CV_INNER = 5
 
 
-def cv_train_with_params(x_train, y_train, model, params, verbose=0, random_state=42):
+def cv_train_with_params(x_train, y_train, classifier, params, verbose=0, random_state=42):
     """
     Perform cross-validation training with specified parameters.
 
     Args:
         x_train (pandas.DataFrame): Training data features
         y_train (pandas.Series): Training data labels
-        model: Model object with fit and predict methods
+        classifier: String representing the model to be used.
         params (dict): Dictionary of parameters
         verbose (int, optional): Verbosity mode
         random_state (int, optional): Random seed
 
     Returns:
-        float: Mean GMean score of the cross-validation.
+        float: Mean AUC score of the cross-validation.
 
     """
 
     inner_skf = StratifiedKFold(
         n_splits=CV_INNER, shuffle=True, random_state=random_state
     )
+
+    auc = []
 
     for _, (learn_idx, val_idx) in enumerate(inner_skf.split(x_train, y_train)):
 
@@ -43,9 +46,19 @@ def cv_train_with_params(x_train, y_train, model, params, verbose=0, random_stat
             x_learn, x_val, y_learn, y_val, params, seed=random_state
         )
 
+        model = get_model(classifier, random_state=random_state)
+
+        if classifier == "CAT":
+            w_pos = len(y_learn) / (2 * np.sum(y_learn))
+            w_neg = len(y_learn) / (2 * (len(y_learn) - np.sum(y_learn)))
+
+            model.set_params(
+                class_weights=[w_neg, w_pos]
+            )
+
         model.fit(x_learn, y_learn, verbose=0)
         pred_val = model.predict(x_val)
 
-        score = geometric_mean_score(y_val, pred_val)
+        auc.append(roc_auc_score(y_val, pred_val))
 
-    return score.mean()
+    return np.mean(auc)

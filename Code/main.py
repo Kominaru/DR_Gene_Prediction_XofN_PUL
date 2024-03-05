@@ -12,17 +12,13 @@ CLASSIFIER = "CAT"
 CV_OUTER = 10
 CV_INNER = 5
 SEED = 42 if len(sys.argv) < 2 else int(sys.argv[1])
-DO_GRID_SEARCH = True
 HYPER_PARAMS = {
-    "sampling_method": ["under"],
-    "binary_threshold": [4],
-    "use_original_features": [True],
+    "sampling_method": ["normal"],
+    "binary_threshold": [5],
+    "use_original_features": [False],
     "use_xofn_features": [True],
-    "xofn_min_sample_leaf": [2,5,10],
+    "xofn_min_sample_leaf": [2, 5, 10],
 }
-
-
-model = get_model(CLASSIFIER, SEED)
 
 x, y = load_data(f"./Data/Datasets/{DATASET}.csv")
 
@@ -36,7 +32,7 @@ for k, (train_idx, test_idx) in enumerate(outer_cv.split(x, y)):
     x_train, x_test = x.iloc[train_idx], x.iloc[test_idx]
     y_train, y_test = y[train_idx], y[test_idx]
 
-    best_config_params = grid_search_hyperparams(HYPER_PARAMS, x_train, y_train, model)
+    best_config_params = grid_search_hyperparams(HYPER_PARAMS, x_train, y_train, CLASSIFIER, SEED)
 
     x_train, y_train = resample_data(
         x_train,
@@ -48,6 +44,16 @@ for k, (train_idx, test_idx) in enumerate(outer_cv.split(x, y)):
     x_train, x_test = generate_features(
         x_train, x_test, y_train, y_test, best_config_params, seed=SEED, verbose=1
     )
+
+    model = get_model(CLASSIFIER, SEED)
+
+    # If the model is a CatBoostClassifier, modify the class weights based on the number of positive and negative samples
+    if CLASSIFIER == "CAT":
+        w_pos = len(y_train) / (2 * np.sum(y_train))
+        w_neg = len(y_train) / (2 * (len(y_train) - np.sum(y_train)))
+
+        model.set_params(
+            class_weights=[w_neg, w_pos])
 
     model.fit(x_train, y_train, verbose=0)
     out_prob_test = model.predict_proba(x_test)[:, 1]
