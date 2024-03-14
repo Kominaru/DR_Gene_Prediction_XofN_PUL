@@ -5,20 +5,37 @@ from Code.models import get_model
 from Code.data_processing import load_data, generate_features, resample_data
 from Code.hyperparameter_tuning import grid_search_hyperparams
 from Code.metrics import compute_metrics
+import argparse
 
 # Execution parameters
-DATASET = "PathDip"
-CLASSIFIER = "CAT"
+parser = argparse.ArgumentParser()
+parser.add_argument("--dataset", type=str, help="Dataset name")
+parser.add_argument("--classifier", type=str, help="Classifier name")
+parser.add_argument("--random_state", type=int, help="Random seed")
+args = parser.parse_args()
+
+DATASET = args.dataset if args.dataset else "PathDIP"
+CLASSIFIER = args.classifier if args.classifier else "CAT"
+SEED = args.random_state if args.random_state else 42
+
 CV_OUTER = 10
 CV_INNER = 5
-SEED = 42 if len(sys.argv) < 2 else int(sys.argv[1])
 HYPER_PARAMS = {
     "sampling_method": ["normal"],
     "binary_threshold": [5],
     "use_original_features": [False],
     "use_xofn_features": [True],
-    "xofn_min_sample_leaf": [2, 5, 10],
+    "xofn_min_sample_leaf": [2,5,10],
+    "xofn_feature_type": ["numerical"],
 }
+
+print(f"""Running experiment with the following parameters""")
+print(f"Dataset: {DATASET}")
+print(f"Classifier: {CLASSIFIER}")
+print(f"Random seed: {SEED}")
+for param, value in HYPER_PARAMS.items(): print(f"{param}: {value}")
+
+
 
 x, y = load_data(f"./Data/Datasets/{DATASET}.csv")
 
@@ -54,8 +71,34 @@ for k, (train_idx, test_idx) in enumerate(outer_cv.split(x, y)):
 
         model.set_params(
             class_weights=[w_neg, w_pos])
+    
+    if CLASSIFIER == "CAT":
+        if best_config_params["use_xofn_features"] and best_config_params["xofn_feature_type"] == "categorical":
+            x_of_n_features = [col for col in x_train.columns if "X_of_N" in col]
+            model.fit(x_train, y_train, verbose=0, cat_features=x_of_n_features)
+        else:
+            model.fit(x_train, y_train, verbose=0)
+    else:
+        model.fit(x_train, y_train)
 
-    model.fit(x_train, y_train, verbose=0)
+    ###################
+    # TEMPORARY TESTING
+    
+    top_feature_indices = np.argsort(model.feature_importances_)[::-1][:50]
+
+    # Get the names of the features
+    feature_names = x_train.columns
+
+    # Log the most important features and their types (original or X-of-N)
+    with open("feature_importances.txt", "a") as f:
+        f.write("="*20 + "\n")
+        f.write(f"Fold {k}\n")
+        for idx in top_feature_indices:
+            feature_name = feature_names[idx]
+            feature_type = "Original" if feature_name.startswith("X-of-N") else "X-of-N"
+            feature_importance = model.feature_importances_[idx]
+            f.write(f"{feature_name} ({feature_type}): {feature_importance}\n")
+        
     out_prob_test = model.predict_proba(x_test)[:, 1]
 
     metrics = compute_metrics(y_test, out_prob_test)

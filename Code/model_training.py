@@ -55,8 +55,20 @@ def cv_train_with_params(x_train, y_train, classifier, params, verbose=0, random
             model.set_params(
                 class_weights=[w_neg, w_pos]
             )
+        if classifier == "CAT":
+            
+            #If X-of-N features are used and categorical is activated,
+            #indicate that the features are categorical
 
-        model.fit(x_learn, y_learn, verbose=0)
+            if params["use_xofn_features"] and params["xofn_feature_type"] == "categorical":
+                x_of_n_features = [col for col in x_learn.columns if "X_of_N" in col]
+                print(x_of_n_features)
+                model.fit(x_learn, y_learn, verbose=0, cat_features=x_of_n_features)
+            else:
+                model.fit(x_learn, y_learn, verbose=0)
+        else:
+            model.fit(x_learn, y_learn)
+            
         pred_val = model.predict(x_val)
 
         auc.append(roc_auc_score(y_val, pred_val))

@@ -66,11 +66,14 @@ def generate_features(
             x_train, y_train, min_samples_leaf=params["xofn_min_sample_leaf"], seed=seed
         )
 
-        if params["use_original_features"]:
-            xofn_features = [path for path in xofn_features if len(path) > 1]
+        xofn_features = [path for path in xofn_features if len(path) > 1]
 
         x_train_xofn = compute_xofn(x_train, xofn_features)
         x_test_xofn = compute_xofn(x_test, xofn_features)
+
+        if params["xofn_feature_type"] == "categorical":
+            x_train_xofn = x_train_xofn.astype("str")
+            x_test_xofn = x_test_xofn.astype("str")
 
         x_train_temp = pd.concat([x_train_temp, x_train_xofn], axis=1)
         x_test_temp = pd.concat([x_test_temp, x_test_xofn], axis=1)

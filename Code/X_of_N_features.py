@@ -80,7 +80,7 @@ def prune_xofn(x, y, path):
     xofn_best = create_xofn(x, path_best)
 
     # Stop prunning when the X-of-N feature couldn't be reduced or it has only one feature
-    while len(path_best) >= 2 and len(path_best) < len(path_prev):
+    while len(path_best) > 2 and len(path_best) < len(path_prev):
 
         path_size_best = path_best.copy()
         xofn_size_best = xofn_best
