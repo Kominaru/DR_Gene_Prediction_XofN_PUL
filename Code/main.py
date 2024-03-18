@@ -16,7 +16,7 @@ args = parser.parse_args()
 
 DATASET = args.dataset if args.dataset else "PathDIP"
 CLASSIFIER = args.classifier if args.classifier else "CAT"
-SEED = args.random_state if args.random_state else 42
+RANDOM_STATE = args.random_state if args.random_state else 42
 
 CV_OUTER = 10
 CV_INNER = 5
@@ -25,21 +25,22 @@ HYPER_PARAMS = {
     "binary_threshold": [5],
     "use_original_features": [False],
     "use_xofn_features": [True],
-    "xofn_min_sample_leaf": [2,5,10],
+    "xofn_min_sample_leaf": [5],
     "xofn_feature_type": ["numerical"],
+    "max_xofn_size": [5],
 }
 
 print(f"""Running experiment with the following parameters""")
 print(f"Dataset: {DATASET}")
 print(f"Classifier: {CLASSIFIER}")
-print(f"Random seed: {SEED}")
+print(f"Random seed: {RANDOM_STATE}")
 for param, value in HYPER_PARAMS.items(): print(f"{param}: {value}")
 
 
 
 x, y = load_data(f"./Data/Datasets/{DATASET}.csv")
 
-outer_cv = StratifiedKFold(n_splits=CV_OUTER, shuffle=True, random_state=SEED)
+outer_cv = StratifiedKFold(n_splits=CV_OUTER, shuffle=True, random_state=RANDOM_STATE)
 
 results = []
 
@@ -49,20 +50,20 @@ for k, (train_idx, test_idx) in enumerate(outer_cv.split(x, y)):
     x_train, x_test = x.iloc[train_idx], x.iloc[test_idx]
     y_train, y_test = y[train_idx], y[test_idx]
 
-    best_config_params = grid_search_hyperparams(HYPER_PARAMS, x_train, y_train, CLASSIFIER, SEED)
+    best_config_params = grid_search_hyperparams(HYPER_PARAMS, x_train, y_train, CLASSIFIER, RANDOM_STATE)
 
     x_train, y_train = resample_data(
         x_train,
         y_train,
         method=best_config_params["sampling_method"],
-        random_state=SEED,
+        random_state=RANDOM_STATE,
     )
 
     x_train, x_test = generate_features(
-        x_train, x_test, y_train, y_test, best_config_params, seed=SEED, verbose=1
+        x_train, x_test, y_train, y_test, best_config_params, random_state=RANDOM_STATE, verbose=1
     )
 
-    model = get_model(CLASSIFIER, SEED)
+    model = get_model(CLASSIFIER, RANDOM_STATE)
 
     # If the model is a CatBoostClassifier, modify the class weights based on the number of positive and negative samples
     if CLASSIFIER == "CAT":

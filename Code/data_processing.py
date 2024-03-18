@@ -29,7 +29,7 @@ def generate_features(
     y_train: pd.DataFrame,
     y_test,
     params: dict,
-    seed: int = 42,
+    random_state: int = 42,
     verbose: int = 0,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
@@ -41,7 +41,7 @@ def generate_features(
         - y_train (pd.Series): Training data labels.
         - y_test (pd.Series): Testing data labels.
         - params (dict): Dictionary containing parameters for feature generation.
-        - seed (int, optional): Random seed.
+        - random_state (int, optional): Random seed.
         - verbose (int, optional): Whether to print number and type of features used.
     Returns:
         - x_train_temp (pd.DataFrame): Transformed training data features.
@@ -53,20 +53,24 @@ def generate_features(
     x_train = x_train.loc[:, x_train.sum() >= params["binary_threshold"]]
     x_test = x_test.loc[:, x_train.columns]
 
-    if verbose: print('\t\t\t',f"Using features:", end="")
+    if verbose:
+        print("\t\t\t", f"Using features:", end="")
 
     if params["use_original_features"]:
         x_train_temp = pd.concat([x_train_temp, x_train], axis=1)
         x_test_temp = pd.concat([x_test_temp, x_test], axis=1)
 
-        if verbose: print(f"+ {x_train.shape[1]} OG", end="")
+        if verbose:
+            print(f"+ {x_train.shape[1]} OG", end="")
 
     if params["use_xofn_features"]:
         xofn_features = construct_xofn_features(
-            x_train, y_train, min_samples_leaf=params["xofn_min_sample_leaf"], seed=seed
+            x_train,
+            y_train,
+            min_samples_leaf=params["xofn_min_sample_leaf"],
+            max_xofn_size=params["max_xofn_size"],
+            random_state=random_state,
         )
-
-        xofn_features = [path for path in xofn_features if len(path) > 1]
 
         x_train_xofn = compute_xofn(x_train, xofn_features)
         x_test_xofn = compute_xofn(x_test, xofn_features)
@@ -78,9 +82,11 @@ def generate_features(
         x_train_temp = pd.concat([x_train_temp, x_train_xofn], axis=1)
         x_test_temp = pd.concat([x_test_temp, x_test_xofn], axis=1)
 
-        if verbose: print(f"+ {x_train_xofn.shape[1]} X-of-N", end="")
+        if verbose:
+            print(f"+ {x_train_xofn.shape[1]} X-of-N", end="")
 
-    if verbose: print()
+    if verbose:
+        print()
 
     return x_train_temp, x_test_temp
 
