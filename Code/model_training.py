@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn.model_selection import StratifiedKFold
-from Code.data_processing import generate_features, resample_data
+from Code.data_processing import generate_features, resample_data, get_data_features
 from Code.models import get_model
 from sklearn.metrics import roc_auc_score
 
@@ -32,7 +32,7 @@ def cv_train_with_params(x_train, y_train, classifier, params, verbose=0, random
 
     for _, (learn_idx, val_idx) in enumerate(inner_skf.split(x_train, y_train)):
 
-        x_learn, x_val = x_train.iloc[learn_idx], x_train.iloc[val_idx]
+        x_learn, x_val = x_train[learn_idx], x_train[val_idx]
         y_learn, y_val = y_train[learn_idx], y_train[val_idx]
 
         x_learn, y_learn = resample_data(
@@ -42,8 +42,8 @@ def cv_train_with_params(x_train, y_train, classifier, params, verbose=0, random
             random_state=random_state,
         )
 
-        x_learn, x_val = generate_features(
-            x_learn, x_val, y_learn, y_val, params, seed=random_state
+        x_learn_feat, x_val_feat = generate_features(
+            x_learn, x_val, y_learn, y_val, params, random_state=random_state
         )
 
         model = get_model(classifier, random_state=random_state)
@@ -61,15 +61,15 @@ def cv_train_with_params(x_train, y_train, classifier, params, verbose=0, random
             #indicate that the features are categorical
 
             if params["use_xofn_features"] and params["xofn_feature_type"] == "categorical":
-                x_of_n_features = [col for col in x_learn.columns if "X_of_N" in col]
+                x_of_n_features = [col for col in x_learn_feat.columns if "X_of_N" in col]
                 print(x_of_n_features)
-                model.fit(x_learn, y_learn, verbose=0, cat_features=x_of_n_features)
+                model.fit(x_learn_feat, y_learn, verbose=0, cat_features=x_of_n_features)
             else:
-                model.fit(x_learn, y_learn, verbose=0)
+                model.fit(x_learn_feat, y_learn, verbose=0)
         else:
-            model.fit(x_learn, y_learn)
+            model.fit(x_learn_feat, y_learn)
             
-        pred_val = model.predict(x_val)
+        pred_val = model.predict_proba(x_val_feat)[:, 1]
 
         auc.append(roc_auc_score(y_val, pred_val))
 

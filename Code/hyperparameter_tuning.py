@@ -27,6 +27,11 @@ def grid_search_hyperparams(HYPER_PARAMS, x_train, y_train, model, seed):
     for params in itertools.product(*HYPER_PARAMS.values()):
         params = {k: v for k, v in zip(HYPER_PARAMS, params)}
 
+        if ((params['PU_k']==3 and params['PU_t'] not in [2/3,1]) or 
+            (params['PU_k']==5 and params['PU_t'] not in [4/5,1]) or
+            (params['PU_k']==8 and params['PU_t'] not in [4/5,7/8,1])):
+            continue
+
         score = cv_train_with_params(
             x_train, y_train, model, params, verbose=0, random_state=seed
         )

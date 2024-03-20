@@ -3,43 +3,44 @@ import numpy as np
 from Code.data_processing import load_data
 from sklearn.metrics import pairwise_distances
 
-def pairwise_jaccard_measures(x, y):
-    """
-    Compute the Jaccard Measures for the given Positive Unlabelled dataset.
-    Given a dataset with |P| positive samples and |U| unlabelled samples, this
-    method returns a |U|x(|P|+|U|) matrix containing the Jaccard Measures between
-    each unlabelled sample and the rest of the samples.
+distances = None
 
-    Parameters:
-    - x: array-like of shape (n_samples, n_features)
-        The dataset.
-    - y: array-like of shape (n_samples,). Used to identify the positive samples.
+def compute_pairwise_jaccard_measures(x):
 
-    Returns:
-    - jaccard_measures: array-like of shape (|U|, n_samples), where |U| is the number of unlabelled samples.
-        The Jaccard Measures.
-    """
+    global distances
 
-    intersection = x @ x.T
-    x = np.sum(x, axis=1)
-    union = np.squeeze(x[:, None] + x.T) - intersection
+    x = x.to_numpy().astype(bool)
 
-    return intersection / union
-
-def parwise_jaccard_measures_2(x, y):
-    # Compute the Jaccard Measures using sklearn's pairwise_distances
-
+    distances = pairwise_distances(x, metric="jaccard")
+    distances[np.diag_indices_from(distances)] = np.nan
     
-    jac = pairwise_distances(x, metric="jaccard")
-    return jac
+def select_reliable_negatives(p, u, k, t):
+
+    global distances
+
+    d_subset = np.concatenate([p, u]).T
+
+    distances_subset = distances.copy()
+
+    distances_subset[:, ~np.isin(np.arange(distances_subset.shape[1]), d_subset)] = np.nan
+
+    # print("Percentage of NaNs in distances_subset:", np.isnan(distances_subset).sum() / distances_subset.size)
+
+    topk = np.argsort(distances_subset, axis=1)[:, :k] # Indices of the k closest genes for each gene
+
+    topk_is_unlabelled = np.isin(topk, u) 
+    closest_unlabelled = topk_is_unlabelled[:, 0] # Condition 1: Closest gene is unlabelled
+    topk_percent_unlabelled = np.mean(topk_is_unlabelled, axis=1)
+
+    # from matplotlib import pyplot as plt
+    # plt.hist(topk_percent_unlabelled[d_subset], bins=[(i-1)/10+1/(10*2) for i in range(12)], color='#CCCCCC', label='Examples where $x_{max\_sim} \in P$', alpha=1)
+    # plt.show()
     
-x, y = load_data(f"./Data/Datasets/PathDIP.csv")
-x = x.to_numpy()
+    reliable_negatives = np.where((closest_unlabelled & (topk_percent_unlabelled >= t)))[0]
+    reliable_negatives = np.setdiff1d(reliable_negatives, p, assume_unique=True)
 
-# Compare the speed of both methods
-import timeit
+    print("\t\t\t",f"RN: {len(reliable_negatives)} (P: {len(p)}, U: {len(u)})")
 
-print(timeit.timeit(lambda: pairwise_jaccard_measures(x, y), number=100))
-x = x.astype(bool)
-print(timeit.timeit(lambda: parwise_jaccard_measures_2(x, y), number=100))
+    return reliable_negatives
+
 

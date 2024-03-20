@@ -6,6 +6,8 @@ from imblearn.under_sampling import RandomUnderSampler
 from sklearn.metrics import make_scorer
 from imblearn.metrics import geometric_mean_score
 
+data_features = None
+
 
 def load_data(dataset_path: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
@@ -21,6 +23,30 @@ def load_data(dataset_path: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     x, y = raw_df.iloc[:, 1:-1], raw_df.iloc[:, -1]
     y = np.logical_not(preprocessing.LabelEncoder().fit(y).transform(y)).astype(int)
     return x, y
+
+def store_data_features(x: pd.DataFrame) -> None:
+    """
+    Store the features of the data for later use.
+
+    Parameters:
+    x (pd.DataFrame): The features of the data.
+    """
+    global data_features
+    data_features = x
+
+def get_data_features(indices) -> pd.DataFrame:
+    """
+    Get the examples of the data with the specified indices.
+
+    Parameters:
+    indices (list): The indices of the examples to retrieve.
+
+    Returns:
+    pd.DataFrame: The examples with the specified indices.
+    """
+    return data_features.iloc[indices]
+
+
 
 
 def generate_features(
@@ -47,10 +73,14 @@ def generate_features(
         - x_train_temp (pd.DataFrame): Transformed training data features.
         - x_test_temp (pd.DataFrame): Transformed testing data features.
     """
+
+    x_train = get_data_features(x_train)
+    x_test = get_data_features(x_test)
+
     x_train_temp = pd.DataFrame()
     x_test_temp = pd.DataFrame()
 
-    x_train = x_train.loc[:, x_train.sum() >= params["binary_threshold"]]
+    x_train = x_train.loc[:, x_train.mean() >= params["binary_threshold"]]
     x_test = x_test.loc[:, x_train.columns]
 
     if verbose:
@@ -71,6 +101,9 @@ def generate_features(
             max_xofn_size=params["max_xofn_size"],
             random_state=random_state,
         )
+
+        # Remove features with only one attribute-value pair
+        xofn_features = [f for f in xofn_features if len(f) > 1]
 
         x_train_xofn = compute_xofn(x_train, xofn_features)
         x_test_xofn = compute_xofn(x_test, xofn_features)

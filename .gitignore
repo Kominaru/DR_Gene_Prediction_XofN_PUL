@@ -163,3 +163,5 @@ cython_debug/
 
 outputs/
 catboost_info
+feature_importances.txt
+xofn_sizes.txt

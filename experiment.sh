@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Define a list of integer numbers
-numbers=(42 727 1337 33 14 177013 39 56709 1312 241543903)
+numbers=(14 33 39 42 727 1312 1337 56709 177013 241543903)
 
 # Define the list of datasets
-datasets=("PathDIP" "GODataset")
+datasets=("PathDIP")
 
 # Define the list of classifiers
-classifiers=("CAT" "BRF")
+classifiers=("CAT")
 
 # Get the current date and time
 datetime=$(date +"%Y%m%d_%H%M%S")
@@ -19,7 +19,7 @@ do
     for classifier in "${classifiers[@]}"
     do
         # Loop through the numbers list
-        experiment_name="${dataset}_${classifier}_${datetime}"
+        experiment_name="PUL_FirstSearch_${dataset}_${classifier}_${datetime}"
 
         mkdir -p outputs
         mkdir -p outputs/$experiment_name

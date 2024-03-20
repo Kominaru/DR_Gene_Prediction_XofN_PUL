@@ -157,11 +157,25 @@ def construct_xofn_features(x, y, min_samples_leaf, max_xofn_size, random_state)
 
     all_paths = tree_to_xofn(clf.tree_)
 
+    
+            
+
     # 3) Prune attribute-value pairs from each X-of-N feature through IG maximization
     path_final = set()
     for path in all_paths:  # Prune each X-of-N feature
         path_pruned = prune_xofn(x, y, path, n_max=max_xofn_size)
         path_final.add(path_pruned)
+
+    # Append to a log file the sizes of the X-of-N features
+    with open("xofn_sizes.txt", "a") as f:
+        last_size = -1
+        i = 1
+        while last_size !=0:
+            last_size = len([path for path in path_final if len(path) == i])
+            f.write(f"{i}: {last_size}, ")
+            i += 1
+        f.write("\n")
+
 
     return path_final
 
