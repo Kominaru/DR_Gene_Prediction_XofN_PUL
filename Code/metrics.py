@@ -1,4 +1,4 @@
-from sklearn.metrics import f1_score, precision_score, roc_auc_score, average_precision_score
+from sklearn.metrics import auc, f1_score, precision_recall_curve, precision_score, roc_auc_score
 import pandas as pd
 from imblearn.metrics import geometric_mean_score, sensitivity_score, specificity_score
 
@@ -24,7 +24,9 @@ def compute_metrics(y_true, y_prob):
     test_auc_roc = roc_auc_score(y_true, y_prob)
     test_precision = precision_score(y_true, y_pred)
     test_f1 = f1_score(y_true, y_pred)
-    test_auc_pr = average_precision_score(y_true, y_prob)
+    
+    precisions, recalls, _ = precision_recall_curve(y_true, y_prob)
+    test_auc_pr = auc(recalls, precisions)
 
     metrics = {
         "sensitivity": test_sens,
