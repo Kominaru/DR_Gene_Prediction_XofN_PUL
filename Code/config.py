@@ -21,7 +21,7 @@ def read_config() -> argparse.Namespace:
     parser.add_argument("--features_to_use", type=str, default=["original"], help="Features to use")
     parser.add_argument("--xofn_min_sample_leaf", type=int, default=None, help="XofN minimum sample leaf")
     parser.add_argument("--max_xofn_size", type=int, default=None, help="Maximum XofN size")
-    parser.add_argument("--pu_learning", type=bool, default=False, help="PU learning")
+    parser.add_argument("--pu_learning", type=str, default=False, help="PU learning")
     parser.add_argument("--pu_k", type=int, nargs="+", default=10, help="PU k")
     parser.add_argument("--pu_t", type=float, nargs="+", default=None, help="PU t values")
     parser.add_argument("--pul_num_features", type=int, help="PUL kNN number of features")

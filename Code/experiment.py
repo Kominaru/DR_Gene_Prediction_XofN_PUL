@@ -6,7 +6,7 @@ from code.main import run_experiment
 PARAMS = read_config()
 SEEDS = [14, 33, 39, 42, 727, 1312, 1337, 56709, 177013, 241543903]
 
-neptune_run = neptune.init_run(project='JorgePRuza-Tesis/DR-Gene-Prediction', api_token='PLACEHOLDER')
+neptune_run = neptune.init_run(project='JorgePRuza-Tesis/DR-Gene-Prediction', api_token='eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiI3MDE0YzVjYi1hODRmLTQ4M2YtYTA0NC1mYzNjNDc5YTRlOGQifQ==')
 
 neptune_run["parameters"] = neptune.utils.stringify_unsupported(PARAMS)
 

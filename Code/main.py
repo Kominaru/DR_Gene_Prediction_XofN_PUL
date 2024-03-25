@@ -46,7 +46,7 @@ def run_experiment(PARAMS, random_state=42, neptune_run=None):
                     random_state=random_state,
                 )
 
-            x_train, y_train = pu_learning.select_reliable_negatives(x_train, y_train, best_params["pu_k"], best_params["pu_t"])
+            x_train, y_train = pu_learning.select_reliable_negatives(x_train, y_train, best_params["pu_learning"] ,  best_params["pu_k"], best_params["pu_t"])
         
         x_feat_train, x_feat_test = generate_features(
             x_train, x_test, y_train, y_test, best_params, random_state=random_state
