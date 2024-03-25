@@ -1,13 +1,18 @@
+import time
 import numpy as np
 from sklearn.model_selection import StratifiedKFold
-from Code.data_processing import generate_features, resample_data, get_data_features
-from Code.models import get_model
-from sklearn.metrics import roc_auc_score
+import code.pu_learning as pu_learning
+from code.data_processing import generate_features, resample_data
+from code.models import get_model, set_class_weights
+from sklearn.metrics import f1_score
+from imblearn.metrics import geometric_mean_score
 
 CV_INNER = 5
 
 
-def cv_train_with_params(x_train, y_train, classifier, params, verbose=0, random_state=42):
+def cv_train_with_params(
+    x_train, y_train, classifier, params, random_state=42, verbose=0
+):
     """
     Perform cross-validation training with specified parameters.
 
@@ -28,9 +33,13 @@ def cv_train_with_params(x_train, y_train, classifier, params, verbose=0, random
         n_splits=CV_INNER, shuffle=True, random_state=random_state
     )
 
-    auc = []
+    neptune_run = params["neptune_run"]
+
+    score = []
 
     for _, (learn_idx, val_idx) in enumerate(inner_skf.split(x_train, y_train)):
+
+        t = time.time()
 
         x_learn, x_val = x_train[learn_idx], x_train[val_idx]
         y_learn, y_val = y_train[learn_idx], y_train[val_idx]
@@ -39,8 +48,28 @@ def cv_train_with_params(x_train, y_train, classifier, params, verbose=0, random
             x_learn,
             y_learn,
             method=params["sampling_method"],
-            random_state=random_state,
+            random_state=params["random_state"],
         )
+
+        if params["pu_learning"]:
+            
+            t1 = time.time()
+            if params["dataset"] == "GO" and params["pul_fs"] == "relieff":
+                pu_learning.feature_selection_jaccard(
+                    x_learn,
+                    y_learn,
+                    params["pul_num_features"],
+                    params["pul_fs"],
+                    classifier=classifier,
+                    sampling_method=params["sampling_method"],
+                    random_state=random_state,
+                )
+
+            neptune_run["metrics/fs_time_overhead"].append(time.time() - t1)
+            
+            x_learn, y_learn = pu_learning.select_reliable_negatives(
+                x_train, y_train, params["pu_k"], params["pu_t"]
+            )
 
         x_learn_feat, x_val_feat = generate_features(
             x_learn, x_val, y_learn, y_val, params, random_state=random_state
@@ -49,28 +78,18 @@ def cv_train_with_params(x_train, y_train, classifier, params, verbose=0, random
         model = get_model(classifier, random_state=random_state)
 
         if classifier == "CAT":
-            w_pos = len(y_learn) / (2 * np.sum(y_learn))
-            w_neg = len(y_learn) / (2 * (len(y_learn) - np.sum(y_learn)))
-
-            model.set_params(
-                class_weights=[w_neg, w_pos]
-            )
-        if classifier == "CAT":
-            
-            #If X-of-N features are used and categorical is activated,
-            #indicate that the features are categorical
-
-            if params["use_xofn_features"] and params["xofn_feature_type"] == "categorical":
-                x_of_n_features = [col for col in x_learn_feat.columns if "X_of_N" in col]
-                print(x_of_n_features)
-                model.fit(x_learn_feat, y_learn, verbose=0, cat_features=x_of_n_features)
-            else:
-                model.fit(x_learn_feat, y_learn, verbose=0)
+            model = set_class_weights(model, params["sampling_method"], y_learn)
+            model.fit(x_learn_feat, y_learn, verbose=0)
         else:
             model.fit(x_learn_feat, y_learn)
-            
-        pred_val = model.predict_proba(x_val_feat)[:, 1]
 
-        auc.append(roc_auc_score(y_val, pred_val))
+        pred_val = model.predict(x_val_feat)
 
-    return np.mean(auc)
+        if params["pu_learning"]:
+            score.append(f1_score(y_val, pred_val))
+        else:
+            score.append(geometric_mean_score(y_val, pred_val))
+
+        neptune_run["metrics/inner_fold_time"].append(time.time() - t)
+
+    return np.mean(score)

@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from sklearn import preprocessing
-from Code.X_of_N_features import construct_xofn_features, compute_xofn
+from code.X_of_N_features import construct_xofn_features, compute_xofn
 from imblearn.under_sampling import RandomUnderSampler
 from sklearn.metrics import make_scorer
 from imblearn.metrics import geometric_mean_score
@@ -9,17 +9,20 @@ from imblearn.metrics import geometric_mean_score
 data_features = None
 
 
-def load_data(dataset_path: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+def load_data(dataset_name: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Load data from a CSV file.
 
     Parameters:
-    dataset_path (str): The path to the CSV file.
+    dataset_path (str): The name of the dataset.
 
     Returns:
     tuple: A tuple containing the features (x) and the labels (y).
     """
-    raw_df = pd.read_csv(dataset_path)
+
+    if dataset_name == "GO": dataset_name = "GODataset"
+
+    raw_df = pd.read_csv(f"./Data/{dataset_name}.csv")
     x, y = raw_df.iloc[:, 1:-1], raw_df.iloc[:, -1]
     y = np.logical_not(preprocessing.LabelEncoder().fit(y).transform(y)).astype(int)
     return x, y
@@ -33,6 +36,10 @@ def store_data_features(x: pd.DataFrame) -> None:
     """
     global data_features
     data_features = x
+
+    x = np.arange(len(x))
+
+    return x
 
 def get_data_features(indices) -> pd.DataFrame:
     """
@@ -86,14 +93,14 @@ def generate_features(
     if verbose:
         print("\t\t\t", f"Using features:", end="")
 
-    if params["use_original_features"]:
+    if "original" in params["features_to_use"]:
         x_train_temp = pd.concat([x_train_temp, x_train], axis=1)
         x_test_temp = pd.concat([x_test_temp, x_test], axis=1)
 
         if verbose:
             print(f"+ {x_train.shape[1]} OG", end="")
 
-    if params["use_xofn_features"]:
+    if "xofn" in params["features_to_use"]:
         xofn_features = construct_xofn_features(
             x_train,
             y_train,
@@ -107,10 +114,6 @@ def generate_features(
 
         x_train_xofn = compute_xofn(x_train, xofn_features)
         x_test_xofn = compute_xofn(x_test, xofn_features)
-
-        if params["xofn_feature_type"] == "categorical":
-            x_train_xofn = x_train_xofn.astype("str")
-            x_test_xofn = x_test_xofn.astype("str")
 
         x_train_temp = pd.concat([x_train_temp, x_train_xofn], axis=1)
         x_test_temp = pd.concat([x_test_temp, x_test_xofn], axis=1)
@@ -150,8 +153,10 @@ def resample_data(
         pass
 
     elif method == "under":  # RANDOM UNDER SAMPLING
+        x_train = x_train.reshape(-1, 1)
         rus = RandomUnderSampler(random_state=random_state)
         x_train, y_train = rus.fit_resample(x_train, y_train)
+        x_train = x_train.squeeze()
 
     return x_train, y_train
 
