@@ -68,7 +68,12 @@ def cv_train_with_params(
             neptune_run["metrics/fs_time_overhead"].append(time.time() - t1)
             
             x_learn, y_learn = pu_learning.select_reliable_negatives(
-                x_train, y_train, params["pu_learning"] ,params["pu_k"], params["pu_t"]
+                x_learn, y_learn, params["pu_learning"] ,params["pu_k"], params["pu_t"]
+            )
+
+            # Log the number of reliable negatives
+            neptune_run["metrics/innercv_num_reliable_negatives"].append(
+                np.sum(y_learn == 0)/len(y_learn)
             )
 
         x_learn_feat, x_val_feat = generate_features(

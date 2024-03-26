@@ -27,6 +27,15 @@ def run_experiment(PARAMS, random_state=42, neptune_run=None):
 
         best_params = grid_search_hyperparams(PARAMS, x_train, y_train, random_state=random_state)
 
+        # Log the best numeric hyperparameters
+        if best_params["pu_learning"]=="similarity":
+            neptune_run["hyperarameters/best_selected/pu_k"].append(best_params["pu_k"])
+            neptune_run["hyperarameters/best_selected/pu_t"].append(best_params["pu_t"])
+        elif best_params["pu_learning"]=="threshold":
+            neptune_run["hyperarameters/best_selected/pu_t"].append(best_params["pu_t"])
+
+            
+
         x_train, y_train = resample_data(
             x_train,
             y_train,

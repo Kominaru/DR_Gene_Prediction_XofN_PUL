@@ -1,3 +1,4 @@
+from matplotlib import pyplot as plt
 import numpy as np
 import sklearn
 from code.data_processing import get_data_features
@@ -133,6 +134,8 @@ def select_reliable_negatives(
         p = x[y == 1]
         u = x[y == 0]
 
+        u = u[np.random.permutation(len(u))]
+
         # Split u into k subsets
         u_split = np.array_split(u, k)
 
@@ -146,17 +149,13 @@ def select_reliable_negatives(
 
             x_i_feat = get_data_features(x_i)
 
-            model = RandomForestClassifier(random_state=random_state)
+            model = RandomForestClassifier(random_state=random_state, min_samples_leaf=5)
             model.fit(x_i_feat, y_i)
 
             u_i_feat = get_data_features(u_split[i])
+            p_feat = get_data_features(p)
 
             model_predictions = model.predict_proba(u_i_feat)[:, 1]
-
-            # Print the average probability of the positive class
-            # print(np.mean(model.predict_proba(x_i_feat)[np.where(y_i == 1), 1]))
-            # # Print the average probability of the negative class
-            # print(np.mean(model.predict_proba(x_i_feat)[np.where(y_i == 0), 1]))
 
             rn.append(u_split[i][model_predictions <= t])
 
