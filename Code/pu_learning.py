@@ -54,7 +54,7 @@ def feature_selection_jaccard(
 
 
 def select_reliable_negatives(
-    x:np.ndarray, y:np.ndarray, method:str, k: int, t: float, random_state: int = 42
+    x: np.ndarray, y: np.ndarray, method: str, k: int, t: float, random_state: int = 42
 ) -> tuple:
     """
     Select reliable negative samples based on the given method.
@@ -81,6 +81,12 @@ def select_reliable_negatives(
     y (array-like): The target labels of the selected reliable negative samples.
     """
 
+
+    # A)) Similarity-based approach
+    # 1) For each unlabelled gene, find the k closest genes based on precomputed pairwise jaccard distances
+    # 2) A gene is labelled as a reliable negative if
+    #    a) The closest gene is unlabelled
+    #    b) The proportion of unlabelled genes among the k closest genes is greater than or equal to t
     if method == "similarity":
         k, t = int(k), float(t)
 
