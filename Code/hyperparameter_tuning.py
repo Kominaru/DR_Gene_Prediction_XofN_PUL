@@ -1,6 +1,7 @@
 import itertools
 from code.model_training import cv_train_with_params
 
+
 def get_hyperparam_combinations(HYPER_PARAMS):
     """
     Get all possible combinations of hyperparameters.
@@ -40,14 +41,23 @@ def grid_search_hyperparams(HYPER_PARAMS, x_train, y_train, random_state=42):
     hyperparam_combinations = get_hyperparam_combinations(HYPER_PARAMS)
 
     if len(hyperparam_combinations) == 1:
-        return {k: v[0] if isinstance(v,list) else v for k, v in HYPER_PARAMS.items()}
+        return {k: v[0] if isinstance(v, list) else v for k, v in HYPER_PARAMS.items()}
 
     for params in hyperparam_combinations:
 
-        if ((params['pu_k']==3 and params['pu_t'] not in [.666,1]) or 
-            (params['pu_k']==5 and params['pu_t'] not in [4/5,1]) or
-            (params['pu_k']==8 and params['pu_t'] not in [3/4,7/8,1])):
-            continue
+        if params["pu_learning"] == "similarity":
+            if (
+                (params["pu_k"] == 3 and params["pu_t"] not in [0.666, 1])
+                or (params["pu_k"] == 5 and params["pu_t"] not in [4 / 5, 1])
+                or (params["pu_k"] == 8 and params["pu_t"] not in [3 / 4, 7 / 8, 1])
+            ):
+                continue
+
+        elif params["pu_learning"] == "threshold":
+            if (params["pu_k"] == 1 and params["pu_t"] not in [0.05, 0.1, 0.15, 0.2, 0.25]) or (
+                params["pu_k"] == 3 and params["pu_t"] not in [0.1, 0.2, 0.3, 0.4]
+            ):
+                continue
 
         score = cv_train_with_params(
             x_train, y_train, params["classifier"], params, random_state=random_state, verbose=0
@@ -58,4 +68,5 @@ def grid_search_hyperparams(HYPER_PARAMS, x_train, y_train, random_state=42):
         if score > best_config["score"]:
             best_config = {"params": params, "score": score}
 
+    print(f"Best configuration: {best_config['params']}")
     return best_config["params"]

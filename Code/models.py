@@ -3,6 +3,7 @@ from typing import Union
 from imblearn.ensemble import EasyEnsembleClassifier, BalancedRandomForestClassifier
 from catboost import CatBoostClassifier
 import numpy as np
+from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
 
 
@@ -26,7 +27,9 @@ def get_model(model: str, random_state: int) -> Union[
         ValueError: If the CLASSIFIER parameter is not one of 'EEC', 'BRF', 'CAT', or 'XGB'.
     """
     if model == "EEC":
-        model = EasyEnsembleClassifier(random_state=random_state)
+        model = EasyEnsembleClassifier(
+            random_state=random_state, verbose=0, n_jobs=4, n_estimators=500, sampling_strategy=1
+        )
     elif model == "BRF":
         model = BalancedRandomForestClassifier(
             random_state=random_state,
@@ -34,21 +37,24 @@ def get_model(model: str, random_state: int) -> Union[
             sampling_strategy=1.0,
             replacement=True,
             n_estimators=500,
-            bootstrap=True
+            bootstrap=True,
         )
     elif model == "CAT":
         model = CatBoostClassifier(random_state=random_state, n_estimators=500)
     elif model == "XGB":
-        model = XGBClassifier(random_state=random_state)
-    else:
-        raise ValueError(
-            f"Invalid classifier type {model}. Please choose one of 'EEC', 'BRF', 'CAT', or 'XGB'."
+        model = XGBClassifier(random_state=random_state, n_estimators=500, n_jobs=4)
+
+    elif model == "RF":
+        model = RandomForestClassifier(
+            random_state=random_state, n_estimators=500, n_jobs=4, bootstrap=True, verbose=0, class_weight="balanced"
         )
+    else:
+        raise ValueError(f"Invalid classifier type {model}. Please choose one of 'EEC', 'BRF', 'CAT', or 'XGB'.")
 
     return model
 
 
-def set_class_weights(model, weight : Union[str, float] = "balanced", y_train: np.ndarray = None):
+def set_class_weights(model, weight: Union[str, float] = "balanced", y_train: np.ndarray = None):
     """
     Set the class weights for the model
 

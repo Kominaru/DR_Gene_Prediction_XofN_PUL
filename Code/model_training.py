@@ -10,9 +10,7 @@ from imblearn.metrics import geometric_mean_score
 CV_INNER = 5
 
 
-def cv_train_with_params(
-    x_train, y_train, classifier, params, random_state=42, verbose=0
-):
+def cv_train_with_params(x_train, y_train, classifier, params, random_state=42, verbose=0):
     """
     Perform cross-validation training with specified parameters.
 
@@ -29,9 +27,7 @@ def cv_train_with_params(
 
     """
 
-    inner_skf = StratifiedKFold(
-        n_splits=CV_INNER, shuffle=True, random_state=random_state
-    )
+    inner_skf = StratifiedKFold(n_splits=CV_INNER, shuffle=True, random_state=random_state)
 
     neptune_run = params["neptune_run"]
 
@@ -52,9 +48,9 @@ def cv_train_with_params(
         )
 
         if params["pu_learning"]:
-            
+
             t1 = time.time()
-            if params["dataset"] == "GO" and params["pul_fs"] == "relieff":
+            if params["dataset"] == "GO":
                 pu_learning.feature_selection_jaccard(
                     x_learn,
                     y_learn,
@@ -66,24 +62,28 @@ def cv_train_with_params(
                 )
 
             neptune_run["metrics/fs_time_overhead"].append(time.time() - t1)
-            
+
             x_learn, y_learn = pu_learning.select_reliable_negatives(
-                x_learn, y_learn, params["pu_learning"] ,params["pu_k"], params["pu_t"]
+                x_learn, y_learn, params["pu_learning"], params["pu_k"], params["pu_t"]
             )
 
             # Log the number of reliable negatives
-            neptune_run["metrics/innercv_num_reliable_negatives"].append(
-                np.sum(y_learn == 0)/len(y_learn)
-            )
+            neptune_run["metrics/innercv_num_reliable_negatives"].append(np.sum(y_learn == 0) / len(y_learn))
 
-        x_learn_feat, x_val_feat = generate_features(
-            x_learn, x_val, y_learn, y_val, params, random_state=random_state
-        )
+            # If not enough reliable negatives are found, return a score of 0
+            if np.sum(y_learn == 0) == 0:
+                return 0
+
+        x_learn_feat, x_val_feat = generate_features(x_learn, x_val, y_learn, y_val, params, random_state=random_state)
 
         model = get_model(classifier, random_state=random_state)
 
         if classifier == "CAT":
             model = set_class_weights(model, params["sampling_method"], y_learn)
+            model.fit(x_learn_feat, y_learn, verbose=0)
+        elif classifier == "XGB":
+            pos_weight = (len(y_learn) - np.sum(y_learn)) / np.sum(y_learn)
+            model.set_params(scale_pos_weight=pos_weight)
             model.fit(x_learn_feat, y_learn, verbose=0)
         else:
             model.fit(x_learn_feat, y_learn)

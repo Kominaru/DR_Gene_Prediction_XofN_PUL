@@ -20,12 +20,15 @@ def load_data(dataset_name: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     tuple: A tuple containing the features (x) and the labels (y).
     """
 
-    if dataset_name == "GO": dataset_name = "GODataset"
+    if dataset_name == "GO":
+        dataset_name = "GODataset"
 
     raw_df = pd.read_csv(f"./Data/{dataset_name}.csv")
     x, y = raw_df.iloc[:, 1:-1], raw_df.iloc[:, -1]
     y = np.logical_not(preprocessing.LabelEncoder().fit(y).transform(y)).astype(int)
-    return x, y
+    gene_names = raw_df.iloc[:, 0]
+    return x, y, gene_names
+
 
 def store_data_features(x: pd.DataFrame) -> None:
     """
@@ -41,6 +44,7 @@ def store_data_features(x: pd.DataFrame) -> None:
 
     return x
 
+
 def get_data_features(indices) -> pd.DataFrame:
     """
     Get the examples of the data with the specified indices.
@@ -52,8 +56,6 @@ def get_data_features(indices) -> pd.DataFrame:
     pd.DataFrame: The examples with the specified indices.
     """
     return data_features.iloc[indices]
-
-
 
 
 def generate_features(
