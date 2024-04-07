@@ -1,19 +1,24 @@
 import itertools
+from typing import Literal, Union
 from code.model_training import cv_train_with_params
 
 
-def get_hyperparam_combinations(HYPER_PARAMS):
+def get_hyperparam_combinations(search_space):
     """
-    Get all possible combinations of hyperparameters.
+    Get all possible combinations of hyperparameters to be tested.
 
-    Parameters:
-        - HYPER_PARAMS (dict): A dictionary containing the hyperparameters to be tuned.
+    Parameters
+    ----------
+    - search_space : dict
+      - A dictionary containing the hyperparameters to be tuned.
 
     Returns:
-    list: A list of dictionaries containing all possible combinations of hyperparameters.
+    --------
+    - list[dict]
+      - A list of dictionaries, one per possible combination of hyperparmeters in the search space.
     """
 
-    temp = HYPER_PARAMS.copy()
+    temp = search_space.copy()
 
     # Transform each value in the dictionary into a list
     for key, value in temp.items():
@@ -23,50 +28,96 @@ def get_hyperparam_combinations(HYPER_PARAMS):
     return [dict(zip(temp, values)) for values in itertools.product(*temp.values())]
 
 
-def grid_search_hyperparams(HYPER_PARAMS, x_train, y_train, random_state=42):
+def validate_PUL_thresholds(method: str = None, k: int = None, t: float = None):
+    """
+    Validate the PU learning thresholds.
+
+    Parameters
+    ----------
+    - method : str
+      - The PU learning method.
+    - k : int
+      - The number of positive examples to be selected.
+    - t : float
+      - The threshold to be used.
+
+    Returns:
+    --------
+    - bool
+      - Whether the given thresholds are valid.
+    """
+    if method == "similarity":
+        if (
+            (k == 3 and t not in [0.666, 1])
+            or (k == 5 and t not in [4 / 5, 1])
+            or (k == 8 and t not in [3 / 4, 7 / 8, 1])
+        ):
+            return False
+
+    elif method == "threshold":
+        if (k == 1 and t not in [0.05, 0.1, 0.15, 0.2, 0.25]) or (
+            k == 3 and t not in [0.1, 0.2, 0.3, 0.4]
+        ):
+            return False
+
+    return True
+
+
+def grid_search_hyperparams(
+    x_train,
+    y_train,
+    classifier: Union[Literal["EEC", "BRF", "CAT", "XGB"], None] = None,
+    random_state=42,
+    pu_learning=False,
+    pul_num_features=None,
+    search_space : dict = None,
+    neptune_run=None,
+):
     """
     Perform grid search to find the best hyperparameters for a given model.
 
-    Parameters:
-        - HYPER_PARAMS (dict): A dictionary containing the hyperparameters to be tuned.
-        - x_train (array-like): The input features for training.
-        - y_train (array-like): The target variable for training.
-        - cv_inner (int, optional): The number of folds for inner cross-validation.
+    Parameters
+    ----------
+     - HYPER_PARAMS (dict)
+       - A dictionary containing the hyperparameters to be tuned.
+     - x_train (array-like)
+       - The input features for training.
+     - y_train (array-like)
+       - The target variable for training.
 
     Returns:
-    dict: The best hyperparameters found during grid search.
+     - dict: The best hyperparameters found during grid search.
     """
     best_config = {"params": None, "score": 0}
 
-    hyperparam_combinations = get_hyperparam_combinations(HYPER_PARAMS)
+    hyperparam_combinations = get_hyperparam_combinations(search_space)
 
     if len(hyperparam_combinations) == 1:
-        return {k: v[0] if isinstance(v, list) else v for k, v in HYPER_PARAMS.items()}
+        return {k: v[0] if isinstance(v, list) else v for k, v in search_space.items()}
 
     for params in hyperparam_combinations:
 
-        if params["pu_learning"] == "similarity":
-            if (
-                (params["pu_k"] == 3 and params["pu_t"] not in [0.666, 1])
-                or (params["pu_k"] == 5 and params["pu_t"] not in [4 / 5, 1])
-                or (params["pu_k"] == 8 and params["pu_t"] not in [3 / 4, 7 / 8, 1])
-            ):
-                continue
-
-        elif params["pu_learning"] == "threshold":
-            if (params["pu_k"] == 1 and params["pu_t"] not in [0.05, 0.1, 0.15, 0.2, 0.25]) or (
-                params["pu_k"] == 3 and params["pu_t"] not in [0.1, 0.2, 0.3, 0.4]
-            ):
-                continue
+        if pu_learning and not validate_PUL_thresholds(pu_learning, params["pu_k"], params["pu_t"]):
+            continue
 
         score = cv_train_with_params(
-            x_train, y_train, params["classifier"], params, random_state=random_state, verbose=0
+            x_train,
+            y_train,
+            classifier,
+            random_state=random_state,
+            pu_learning=pu_learning,
+            pul_num_features=pul_num_features,
+            pul_k=params["pu_k"],
+            pul_t=params["pu_t"],
         )
-
-        # print('\t\t',f"Score: {score}, Params: {params}")
 
         if score > best_config["score"]:
             best_config = {"params": params, "score": score}
 
-    print(f"Best configuration: {best_config['params']}")
+    for key, value in best_config["params"].items():
+        if neptune_run:
+            neptune_run["parameters/best_selected" + key].append(value)
+        else:
+            print(f"parameters/{key}: {value}")
+
     return best_config["params"]

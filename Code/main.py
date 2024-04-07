@@ -1,108 +1,69 @@
-import sys
+import neptune
 import numpy as np
-import pandas as pd
-from sklearn.model_selection import StratifiedKFold
-from code.models import get_model, set_class_weights
-from code.data_processing import load_data, generate_features, resample_data, store_data_features
-from code.hyperparameter_tuning import grid_search_hyperparams
-import code.pu_learning as pu_learning
-import code.metrics as metrics
+from code.config import read_config
+from code.experiment import run_experiment
+
+SEEDS = [14, 33, 39, 42, 727, 1312, 1337, 56709, 177013, 241543903]
+
+args = read_config()
+
+if args["neptune"]:
+    neptune_run = neptune.init_run(
+        project="JorgePRuza-Tesis/DR-Gene-Prediction",
+        api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiI3MDE0YzVjYi1hODRmLTQ4M2YtYTA0NC1mYzNjNDc5YTRlOGQifQ==",
+    )
+    neptune_run["parameters"] = neptune.utils.stringify_unsupported(args)
+
+run_metrics_list = []
+run_preds_list = []
+
+search_space = {
+    "pu_k": args["pu_k"],
+    "pu_t": args["pu_t"],
+}
+
+for seed in SEEDS:
+    run_metrics, run_preds = run_experiment(
+        args["dataset"],
+        args["classifier"],
+        args["pul_num_features"],
+        args["pu_learning"],
+        search_space,
+        random_state=seed,
+        neptune_run=neptune_run if args["neptune"] else None,
+    )
+    run_metrics_list.append(run_metrics)
+    run_preds_list.append(run_preds)
 
 
-def run_experiment(PARAMS, random_state=42, neptune_run=None):
-
-    random_state = int(random_state)
-
-    x, y, gene_names = load_data(PARAMS["dataset"])
-
-    pu_learning.compute_pairwise_jaccard_measures(x)
-    x = store_data_features(x)
-
-    outer_cv = StratifiedKFold(n_splits=10, shuffle=True, random_state=random_state)
-
-    preds = []
-
-    metrics_list = []
-
-    for k, (train_idx, test_idx) in enumerate(outer_cv.split(x, y)):
-
-        x_train, x_test = x[train_idx], x[test_idx]
-        y_train, y_test = y[train_idx], y[test_idx]
-
-        best_params = grid_search_hyperparams(PARAMS, x_train, y_train, random_state=random_state)
-
-        print(f"Best params: {best_params}")
-
-        # Log the best numeric hyperparameters
-        if best_params["pu_learning"] == "similarity":
-            neptune_run["hyperarameters/best_selected/pu_k"].append(best_params["pu_k"])
-            neptune_run["hyperarameters/best_selected/pu_t"].append(best_params["pu_t"])
-        elif best_params["pu_learning"] == "threshold":
-            neptune_run["hyperarameters/best_selected/pu_t"].append(best_params["pu_t"])
-
-        x_train, y_train = resample_data(
-            x_train,
-            y_train,
-            method=best_params["sampling_method"],
-            random_state=PARAMS["random_state"],
+for metric in run_metrics_list[0][0].keys():
+    if args["neptune"]:
+        neptune_run["metrics/avg/test/" + metric] = np.mean(
+            [
+                np.mean([fold[metric] for fold in run_metrics])
+                for run_metrics in run_metrics_list
+            ]
         )
+    else: 
+        print(f"metrics/avg/test/{metric}: {np.mean([np.mean([fold[metric] for fold in run_metrics]) for run_metrics in run_metrics_list])}")
 
-        if best_params["pu_learning"]:
-            if best_params["dataset"] == "GO":
-                pu_learning.feature_selection_jaccard(
-                    x_train,
-                    y_train,
-                    best_params["pul_num_features"],
-                    best_params["pul_fs"],
-                    classifier=best_params["classifier"],
-                    sampling_method=best_params["sampling_method"],
-                    random_state=random_state,
-                )
+# Get the average prediction for each gene
+for i in range(1, len(run_preds_list)):
+    run_preds_list[i] = run_preds_list[i].sort_values(by="gene")
 
-            x_train, y_train = pu_learning.select_reliable_negatives(
-                x_train, y_train, best_params["pu_learning"], best_params["pu_k"], best_params["pu_t"]
-            )
+avg_preds = run_preds_list[0].copy()
 
-        x_feat_train, x_feat_test = generate_features(
-            x_train, x_test, y_train, y_test, best_params, random_state=random_state
-        )
+for run_preds in run_preds_list[1:]:
+    avg_preds["prob"] += run_preds["prob"]
 
-        model = get_model(PARAMS["classifier"], random_state)
+avg_preds["prob"] /= len(run_preds_list)
 
-        # If the model is a CatBoostClassifier, modify the class weights based on the number of positive and negative samples
-        if PARAMS["classifier"] in ["CAT"]:
-            model = set_class_weights(model, PARAMS["sampling_method"], y_train)
-            model.fit(x_feat_train, y_train, verbose=0)
-        elif PARAMS["classifier"] == "XGB":
-            pos_weight = (len(y_train) - np.sum(y_train)) / np.sum(y_train)
-            model.set_params(scale_pos_weight=pos_weight)
-            model.fit(x_feat_train, y_train, verbose=0)
-        else:
-            model.fit(x_feat_train, y_train)
+avg_preds = avg_preds.sort_values(by="prob", ascending=False)
 
-        out_prob_test = model.predict_proba(x_feat_test)[:, 1]
+# Drop the id column
+avg_preds = avg_preds.drop(columns=["id"])
 
-        preds += zip(test_idx, gene_names[test_idx], out_prob_test)
-
-        fold_metrics = metrics.compute_metrics(y_test, out_prob_test)
-
-        for metric, value in fold_metrics.items():
-            neptune_run[f"metrics/run_{random_state}/fold_{k}/test/{metric}"] = value
-
-        metrics_list.append(fold_metrics)
-
-    for metric in metrics_list[0].keys():
-        neptune_run[f"metrics/run_{random_state}/global/test/" + metric] = np.mean(
-            [fold[metric] for fold in metrics_list]
-        )
-
-    preds = pd.DataFrame(preds, columns=["id", "gene", "prob"])
-
-    # Save the predictions to neptune
-    preds_sorted = preds.sort_values(by="prob", ascending=False)
-    preds_sorted.to_csv("preds.csv", index=False)
-    neptune_run[f"predictions/run_{random_state}"].upload("preds.csv")
-
-    preds = preds.sort_values(by="id")
-
-    return metrics_list, preds
+if args["neptune"]:
+    avg_preds.to_csv("avg_probs.csv", index=False)
+    neptune_run["predictions/avg"].upload("avg_probs.csv")
+    neptune_run.stop()

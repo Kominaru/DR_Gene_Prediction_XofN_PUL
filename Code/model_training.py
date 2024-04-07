@@ -1,16 +1,27 @@
 import time
+from typing import Literal, Union
+import neptune
 import numpy as np
 from sklearn.model_selection import StratifiedKFold
-import code.pu_learning as pu_learning
-from code.data_processing import generate_features, resample_data
+from code.data_processing import generate_features
 from code.models import get_model, set_class_weights
 from sklearn.metrics import f1_score
 from imblearn.metrics import geometric_mean_score
+import code.pu_learning as pul
 
 CV_INNER = 5
 
 
-def cv_train_with_params(x_train, y_train, classifier, params, random_state=42, verbose=0):
+def cv_train_with_params(
+    x_train,
+    y_train,
+    classifier,
+    random_state=42,
+    pu_learning=False,
+    pul_num_features=None,
+    pul_k=None,
+    pul_t=None,
+):
     """
     Perform cross-validation training with specified parameters.
 
@@ -27,74 +38,96 @@ def cv_train_with_params(x_train, y_train, classifier, params, random_state=42, 
 
     """
 
-    inner_skf = StratifiedKFold(n_splits=CV_INNER, shuffle=True, random_state=random_state)
-
-    neptune_run = params["neptune_run"]
+    inner_skf = StratifiedKFold(
+        n_splits=CV_INNER, shuffle=True, random_state=random_state
+    )
 
     score = []
 
     for _, (learn_idx, val_idx) in enumerate(inner_skf.split(x_train, y_train)):
 
-        t = time.time()
-
         x_learn, x_val = x_train[learn_idx], x_train[val_idx]
         y_learn, y_val = y_train[learn_idx], y_train[val_idx]
 
-        x_learn, y_learn = resample_data(
+        pred_val = train_a_model(
             x_learn,
             y_learn,
-            method=params["sampling_method"],
-            random_state=params["random_state"],
+            x_val,
+            classifier,
+            random_state=random_state,
+            pu_learning=pu_learning,
+            pul_num_features=pul_num_features,
+            pul_k=pul_k,
+            pul_t=pul_t,
         )
 
-        if params["pu_learning"]:
-
-            t1 = time.time()
-            if params["dataset"] == "GO":
-                pu_learning.feature_selection_jaccard(
-                    x_learn,
-                    y_learn,
-                    params["pul_num_features"],
-                    params["pul_fs"],
-                    classifier=classifier,
-                    sampling_method=params["sampling_method"],
-                    random_state=random_state,
-                )
-
-            neptune_run["metrics/fs_time_overhead"].append(time.time() - t1)
-
-            x_learn, y_learn = pu_learning.select_reliable_negatives(
-                x_learn, y_learn, params["pu_learning"], params["pu_k"], params["pu_t"]
-            )
-
-            # Log the number of reliable negatives
-            neptune_run["metrics/innercv_num_reliable_negatives"].append(np.sum(y_learn == 0) / len(y_learn))
-
-            # If not enough reliable negatives are found, return a score of 0
-            if np.sum(y_learn == 0) == 0:
-                return 0
-
-        x_learn_feat, x_val_feat = generate_features(x_learn, x_val, y_learn, y_val, params, random_state=random_state)
-
-        model = get_model(classifier, random_state=random_state)
-
-        if classifier == "CAT":
-            model = set_class_weights(model, params["sampling_method"], y_learn)
-            model.fit(x_learn_feat, y_learn, verbose=0)
-        elif classifier == "XGB":
-            pos_weight = (len(y_learn) - np.sum(y_learn)) / np.sum(y_learn)
-            model.set_params(scale_pos_weight=pos_weight)
-            model.fit(x_learn_feat, y_learn, verbose=0)
+        if pu_learning:
+            score.append(f1_score(y_val, pred_val > 0.5))
         else:
-            model.fit(x_learn_feat, y_learn)
-
-        pred_val = model.predict(x_val_feat)
-
-        if params["pu_learning"]:
-            score.append(f1_score(y_val, pred_val))
-        else:
-            score.append(geometric_mean_score(y_val, pred_val))
-
-        neptune_run["metrics/inner_fold_time"].append(time.time() - t)
+            score.append(geometric_mean_score(y_val, pred_val > 0.5))
 
     return np.mean(score)
+
+
+def train_a_model(
+    x_train,
+    y_train,
+    x_test,
+    classifier: Literal["CAT", "BRF", "XGB", "EEC"],
+    random_state=42,
+    pu_learning=False,
+    pul_num_features=None,
+    pul_k: int = None,
+    pul_t: float = None,
+):
+    """
+    Train a model with the specified parameters.
+
+    Args:
+        x_train (pandas.DataFrame): Training data features
+        y_train (pandas.Series): Training data labels
+        x_test (pandas.DataFrame): Test data features
+        classifier: String representing the model to be used.
+        params (dict): Dictionary of parameters
+        verbose (int, optional): Verbosity mode
+        random_state (int, optional): Random seed
+
+    Returns:
+        model: The trained model
+
+    """
+
+    if pu_learning:
+        pul.feature_selection_jaccard(
+            x_train,
+            y_train,
+            pul_num_features,
+            classifier=classifier,
+            random_state=random_state,
+        )
+
+        x_train, y_train = pul.select_reliable_negatives(
+            x_train,
+            y_train,
+            pu_learning,
+            pul_k,
+            pul_t,
+        )
+
+    x_train, x_test = generate_features(x_train, x_test)
+
+    model = get_model(classifier, random_state=random_state)
+
+    if classifier == "CAT":
+        model = set_class_weights(model, y_train)
+        model.fit(x_train, y_train, verbose=0)
+    elif classifier == "XGB":
+        pos_weight = (len(y_train) - np.sum(y_train)) / np.sum(y_train)
+        model.set_params(scale_pos_weight=pos_weight)
+        model.fit(x_train, y_train, verbose=0)
+    else:
+        model.fit(x_train, y_train)
+
+    probs = model.predict_proba(x_test)[:, 1]
+
+    return probs
