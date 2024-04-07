@@ -1,3 +1,4 @@
+import os
 import neptune
 import numpy as np
 from code.config import read_config
@@ -69,3 +70,6 @@ if __name__ == "__main__":
         avg_preds.to_csv("avg_probs.csv", index=False)
         neptune_run["predictions/avg"].upload("avg_probs.csv")
         neptune_run.stop()
+
+    os.remove("preds_temp.csv")
+    os.remove("avg_probs.csv")

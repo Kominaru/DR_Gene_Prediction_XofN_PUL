@@ -1,4 +1,4 @@
-import sys
+import os
 import neptune
 import pandas as pd
 from typing import Union
@@ -25,4 +25,4 @@ def upload_preds_to_neptune(
     preds_sorted = preds.sort_values(by="prob", ascending=False)
     preds_sorted.to_csv("preds_temp.csv", index=False)
     neptune_run[f"predictions/run_{random_state}"].upload("preds_temp.csv")
-    sys.remove("preds_temp.csv")
+    
