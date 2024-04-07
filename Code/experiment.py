@@ -108,7 +108,7 @@ def run_experiment(
     # Log the metrics to neptune
     for metric in experiment_metrics[0].keys():
         if neptune_run:
-            neptune_run["metrics/run_{random_state}/avg/test/{metric}"] = np.mean(
+            neptune_run[f"metrics/run_{random_state}/avg/test/{metric}"] = np.mean(
                 [fold_metrics[metric] for fold_metrics in experiment_metrics]
             )
         else:
