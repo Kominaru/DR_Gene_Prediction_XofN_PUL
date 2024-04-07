@@ -41,7 +41,7 @@ def get_model(model: str, random_state: int) -> Union[
             sampling_strategy=1,
             n_estimators=500,
             bootstrap=False,
-            replacement=False
+            replacement=True
         )
     elif model == "CAT":
         model = CatBoostClassifier(
