@@ -16,7 +16,7 @@ def cv_train_with_params(
     x_train,
     y_train,
     classifier,
-    random_state=42,
+    random_state,
     pu_learning=False,
     pul_num_features=None,
     pul_k=None,
@@ -74,8 +74,8 @@ def train_a_model(
     y_train,
     x_test,
     classifier: Literal["CAT", "BRF", "XGB", "EEC"],
-    random_state=42,
-    pu_learning=False,
+    random_state: int,
+    pu_learning : str | bool = False,
     pul_num_features=None,
     pul_k: int = None,
     pul_t: float = None,
@@ -112,6 +112,7 @@ def train_a_model(
             pu_learning,
             pul_k,
             pul_t,
+            random_state=random_state,
         )
 
     x_train, x_test = generate_features(x_train, x_test)
