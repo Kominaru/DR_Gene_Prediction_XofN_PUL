@@ -1,6 +1,6 @@
 # <div align="center"> PU Learning for DR Gene Discovery </div>
 
-### <div align="center"> Jorge Paz-Ruza*, Alex A. Freitas <br> <br> [Positive-Unlabelled learning for identifying new candidate <br> Dietary Restriction-related genes among ageing-related genes](https://doi.org/10.1016/j.compbiomed.2024.108999) </div>
+### <div align="center"> Jorge Paz-Ruza*, Alex A. Freitas, Amparo Alonso-Betanzos, Bertha Guijarro-Berdiñas <br> <br> [Positive-Unlabelled learning for identifying new candidate <br> Dietary Restriction-related genes among ageing-related genes](https://doi.org/10.1016/j.compbiomed.2024.108999) </div>
 
 ##### <div align="center"> Published on <b>Computers in Biology and Medicine</b>, Vol. 180, 2024</div>
 
