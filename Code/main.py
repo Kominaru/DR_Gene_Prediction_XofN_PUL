@@ -1,10 +1,14 @@
 import os
+from codecarbon import EmissionsTracker
 import neptune
 import numpy as np
 from code.config import read_config
 from code.experiment import run_experiment
 
 if __name__ == "__main__":
+
+    tracker = EmissionsTracker(tracking_mode="process", save_to_file=False, log_level="error")
+    tracker.start()
 
     SEEDS = [14, 33, 39, 42, 727, 1312, 1337, 56709, 177013, 241543903]
 
@@ -34,21 +38,20 @@ if __name__ == "__main__":
             search_space,
             random_state=seed,
             neptune_run=neptune_run if args["neptune"] else None,
+            tracker=tracker,
         )
         run_metrics_list.append(run_metrics)
         run_preds_list.append(run_preds)
 
-
     for metric in run_metrics_list[0][0].keys():
         if args["neptune"]:
             neptune_run["metrics/avg/test/" + metric] = np.mean(
-                [
-                    np.mean([fold[metric] for fold in run_metrics])
-                    for run_metrics in run_metrics_list
-                ]
+                [np.mean([fold[metric] for fold in run_metrics]) for run_metrics in run_metrics_list]
             )
-        else: 
-            print(f"metrics/avg/test/{metric}: {np.mean([np.mean([fold[metric] for fold in run_metrics]) for run_metrics in run_metrics_list])}")
+        else:
+            print(
+                f"metrics/avg/test/{metric}: {np.mean([np.mean([fold[metric] for fold in run_metrics]) for run_metrics in run_metrics_list])}"
+            )
 
     # Get the average prediction for each gene
     for i in range(1, len(run_preds_list)):
@@ -66,10 +69,15 @@ if __name__ == "__main__":
     # Drop the id column
     avg_preds = avg_preds.drop(columns=["id"])
 
+    tracker.stop()
+
+    print("Total emissions: ", tracker.final_emissions * 1000 / len(SEEDS), " gCO2e")
+
     if args["neptune"]:
-        avg_preds.to_csv("avg_probs.csv", index=False)
         neptune_run["predictions/avg"].upload("avg_probs.csv")
         neptune_run.stop()
 
-    os.remove("preds_temp.csv")
-    os.remove("avg_probs.csv")
+    if os.path.exists("preds_temp.csv"):
+        os.remove("preds_temp.csv")
+    if os.path.exists("preds_temp.csv"):
+        os.remove("avg_probs.csv")

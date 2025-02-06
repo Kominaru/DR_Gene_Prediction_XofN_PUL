@@ -7,6 +7,7 @@ from code.model_training import train_a_model
 from code.data_processing import load_data, store_data_features
 from code.hyperparameter_tuning import grid_search_hyperparams
 from code.neptune_utils import upload_preds_to_neptune
+from codecarbon.emissions_tracker import EmissionsTracker
 import code.metrics as metrics
 import code.pu_learning as pul
 
@@ -19,6 +20,7 @@ def run_experiment(
     search_space: dict = None,
     random_state: int = 42,
     neptune_run: Union[neptune.Run, None] = None,
+    tracker: EmissionsTracker = None,
 ):
     """
     Run a single experiment with the given parameters performing a nested 10x5 cross-validation.
@@ -54,7 +56,9 @@ def run_experiment(
 
     x, y, gene_names = load_data(dataset)
 
-    pul.compute_pairwise_jaccard_measures(x)
+    if pu_learning and random_state == 14:
+        pul.compute_pairwise_jaccard_measures(x)
+
     x = store_data_features(x)
 
     outer_cv = StratifiedKFold(n_splits=10, shuffle=True, random_state=random_state)
@@ -66,6 +70,8 @@ def run_experiment(
         x_train, x_test = x[train_idx], x[test_idx]
         y_train, y_test = y[train_idx], y[test_idx]
 
+        tracker.stop()
+
         best_params = grid_search_hyperparams(
             x_train,
             y_train,
@@ -76,6 +82,8 @@ def run_experiment(
             search_space=search_space,
             neptune_run=neptune_run,
         )
+
+        tracker.start()
 
         pred_test = train_a_model(
             x_train,
@@ -90,9 +98,7 @@ def run_experiment(
         )
 
         experiment_preds += zip(test_idx, gene_names[test_idx], pred_test)
-        fold_metrics = metrics.log_metrics(
-            y_test, pred_test, neptune_run=neptune_run, run_number=random_state, fold=k
-        )
+        fold_metrics = metrics.log_metrics(y_test, pred_test, neptune_run=neptune_run, run_number=random_state, fold=k)
         experiment_metrics.append(fold_metrics)
 
     experiment_preds = pd.DataFrame(experiment_preds, columns=["id", "gene", "prob"])
@@ -108,12 +114,12 @@ def run_experiment(
     # Log the metrics to neptune
     for metric in experiment_metrics[0].keys():
         if neptune_run:
-            neptune_run[f"metrics/run_{random_state}/avg/test/{metric}"] = np.mean(
+            neptune_run[f"metrics/run_{random_state}/global/test/{metric}"] = np.mean(
                 [fold_metrics[metric] for fold_metrics in experiment_metrics]
             )
         else:
             print(
-                f"metrics/run_{random_state}/avg/test/{metric}: {np.mean([fold_metrics[metric] for fold_metrics in experiment_metrics])}"
+                f"metrics/run_{random_state}/global/test/{metric}: {np.mean([fold_metrics[metric] for fold_metrics in experiment_metrics])}"
             )
 
     return experiment_metrics, experiment_preds

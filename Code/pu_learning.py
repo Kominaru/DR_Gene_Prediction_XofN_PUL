@@ -21,6 +21,8 @@ def compute_pairwise_jaccard_measures(x):
 
     global distances
 
+    print("COMPUTING JACCARD MEASURES")
+
     x = x.to_numpy().astype(bool)
 
     distances = pairwise_distances(x, metric="jaccard")
@@ -121,7 +123,6 @@ def select_reliable_negatives(
     p = x[y == 1]
     u = x[y == 0]
 
-
     # A)) Similarity-based approach
     # 1) For each unlabelled gene, find the k closest genes based on precomputed pairwise jaccard distances
     # 2) A gene is labelled as a reliable negative if
@@ -139,14 +140,15 @@ def select_reliable_negatives(
         topk = np.argsort(distances_subset, axis=1)[:, :k]
 
         topk_is_unlabelled = np.isin(topk, u)
-        closest_unlabelled = topk_is_unlabelled[
-            :, 0
-        ]  # Condition 1: Closest gene is unlabelled
-        topk_percent_unlabelled = np.mean(topk_is_unlabelled, axis=1) >= t # Condition 2: Proportion of unlabelled genes among the k closest genes is >= t
-
+        closest_unlabelled = topk_is_unlabelled[:, 0]  # Condition 1: Closest gene is unlabelled
+        topk_percent_unlabelled = (
+            np.mean(topk_is_unlabelled, axis=1) >= t
+        )  # Condition 2: Proportion of unlabelled genes among the k closest genes is >= t
 
         rn = np.where((closest_unlabelled & (topk_percent_unlabelled)))[0]
-        rn = np.intersect1d(rn, u) # This avoid leakage of info from the val/test sets (not considered for reliable negatives)
+        rn = np.intersect1d(
+            rn, u
+        )  # This avoid leakage of info from the val/test sets (not considered for reliable negatives)
 
     # B)) Threshold-based approach
     # 1) Split the unlabelled data into k subsets
@@ -170,9 +172,7 @@ def select_reliable_negatives(
 
             x_i_feat = get_data_features(x_i)
 
-            model = RandomForestClassifier(
-                random_state=random_state, min_samples_leaf=5
-            )
+            model = RandomForestClassifier(random_state=random_state, min_samples_leaf=5)
             model.fit(x_i_feat, y_i)
 
             u_i_feat = get_data_features(u_split[i])
