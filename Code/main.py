@@ -13,7 +13,7 @@ if __name__ == "__main__":
     if args["neptune"]:
         neptune_run = neptune.init_run(
             project="JorgePRuza-Tesis/DR-Gene-Prediction",
-            api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiI3MDE0YzVjYi1hODRmLTQ4M2YtYTA0NC1mYzNjNDc5YTRlOGQifQ==",
+            api_token="INSERT YOUR API TOKEN HERE",  # NEPTUNE API TOKEN GOES HERE
         )
         neptune_run["parameters"] = neptune.utils.stringify_unsupported(args)
 
@@ -38,7 +38,6 @@ if __name__ == "__main__":
         run_metrics_list.append(run_metrics)
         run_preds_list.append(run_preds)
 
-
     for metric in run_metrics_list[0][0].keys():
         if args["neptune"]:
             neptune_run["metrics/avg/test/" + metric] = np.mean(
@@ -47,8 +46,10 @@ if __name__ == "__main__":
                     for run_metrics in run_metrics_list
                 ]
             )
-        else: 
-            print(f"metrics/avg/test/{metric}: {np.mean([np.mean([fold[metric] for fold in run_metrics]) for run_metrics in run_metrics_list])}")
+        else:
+            print(
+                f"metrics/avg/test/{metric}: {np.mean([np.mean([fold[metric] for fold in run_metrics]) for run_metrics in run_metrics_list])}"
+            )
 
     # Get the average prediction for each gene
     for i in range(1, len(run_preds_list)):
@@ -71,5 +72,7 @@ if __name__ == "__main__":
         neptune_run["predictions/avg"].upload("avg_probs.csv")
         neptune_run.stop()
 
-    os.remove("preds_temp.csv")
-    os.remove("avg_probs.csv")
+    if os.path.exists("preds_temp.csv"):
+        os.remove("preds_temp.csv")
+    if os.path.exists("avg_probs.csv"):
+        os.remove("avg_probs.csv")
